@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiber Optic Inventory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        #app-content { display: none; }
+        .loader { border-top-color: #00B900; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+    <div id="loading-screen" class="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+        <div class="loader ease-linear rounded-full border-4 border-gray-200 h-16 w-16 mb-4"></div>
+        <h2 class="text-xl font-semibold text-gray-700">กำลังเชื่อมต่อระบบ...</h2>
+    </div>
+
+    <div id="app-content" class="max-w-md mx-auto bg-white min-h-screen shadow-md relative pb-10">
+        <div class="bg-[#00B900] text-white p-4 shadow-sm flex items-center justify-between rounded-b-xl">
+            <div>
+                <h1 class="text-lg font-bold">ระบบเบิกจ่ายอุปกรณ์</h1>
+                <p id="user-name-display" class="text-sm opacity-90">ผู้ใช้งาน: กำลังโหลด...</p>
+            </div>
+            <img id="user-profile-img" src="" alt="Profile" class="w-10 h-10 rounded-full border-2 border-white hidden">
+        </div>
+
+        <div class="p-4">
+            <h2 class="text-gray-600 font-semibold mb-3">เลือกทำรายการ</h2>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="openMenu('consume')" class="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center hover:bg-blue-100 transition shadow-sm">
+                    <span class="text-2xl mb-1">🛠️</span>
+                    <span class="text-sm font-medium text-blue-700">เบิกใช้งาน</span>
+                </button>
+                <button onclick="openMenu('defect')" class="bg-red-50 border border-red-200 p-4 rounded-xl flex flex-col items-center justify-center hover:bg-red-100 transition shadow-sm">
+                    <span class="text-2xl mb-1">⚠️</span>
+                    <span class="text-sm font-medium text-red-700">แจ้งของเสีย</span>
+                </button>
+                <button id="btn-transfer" onclick="openMenu('transfer')" class="bg-purple-50 border border-purple-200 p-4 rounded-xl flex flex-col items-center justify-center hover:bg-purple-100 transition shadow-sm hidden">
+                    <span class="text-2xl mb-1">🔄</span>
+                    <span class="text-sm font-medium text-purple-700">โอนข้ามทีม</span>
+                </button>
+                <button id="btn-receive" onclick="openMenu('receive')" class="bg-green-50 border border-green-200 p-4 rounded-xl flex flex-col items-center justify-center hover:bg-green-100 transition shadow-sm hidden">
+                    <span class="text-2xl mb-1">📦</span>
+                    <span class="text-sm font-medium text-green-700">รับของเข้า</span>
+                </button>
+            </div>
+
+            <div class="mt-6">
+                <h2 class="text-gray-600 font-semibold mb-3">สต๊อกคงเหลือของทีม</h2>
+                <div id="inventory-list" class="space-y-2">
+                    <div class="p-3 bg-gray-100 rounded-lg text-center text-sm text-gray-500">กำลังดึงข้อมูล...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="consume-form-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-lg w-11/12 max-w-md max-h-[90vh] overflow-y-auto p-5">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-blue-700">🛠️ ฟอร์มเบิกใช้งาน</h2>
+                <button onclick="closeModal('consume-form-modal')" class="text-gray-500 hover:text-red-500 text-2xl font-bold">&times;</button>
+            </div>
+            <form id="consumeForm" onsubmit="submitTransactionForm(event, 'CONSUME')" class="space-y-3">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">รหัสอ้างอิงงาน (Job/Ticket ID)</label>
+                    <input type="text" id="consume-ref" required class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">เลือกอุปกรณ์</label>
+                    <select id="consume-item" required onchange="checkItemType('consume')" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                        <option value="">-- กรุณาเลือก --</option>
+                    </select>
+                </div>
+                <div id="consume-fiber-fields" class="hidden bg-blue-50 p-3 rounded-lg border border-blue-200 space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">เลือกม้วนสาย (Drum/Batch)</label>
+                        <select id="consume-drum" class="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm">
+                            <option value="">-- กรุณาเลือกม้วนสาย --</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">มาร์คเริ่มต้น</label>
+                            <input type="number" id="consume-mark-start" oninput="calculateFiberQty('consume')" class="w-full border border-gray-300 rounded-lg p-2 bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">มาร์คสิ้นสุด</label>
+                            <input type="number" id="consume-mark-end" oninput="calculateFiberQty('consume')" class="w-full border border-gray-300 rounded-lg p-2 bg-white">
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">จำนวนที่เบิก</label>
+                    <input type="number" id="consume-qty" min="1" step="0.01" required class="w-full border border-gray-300 rounded-lg p-2 font-bold text-lg">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">หมายเหตุ (ถ้ามี)</label>
+                    <input type="text" id="consume-remark" class="w-full border border-gray-300 rounded-lg p-2">
+                </div>
+                <div class="pt-3">
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">ยืนยันการเบิก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="receive-form-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-lg w-11/12 max-w-md max-h-[90vh] overflow-y-auto p-5">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-green-700">📦 ฟอร์มรับของเข้าคลัง</h2>
+                <button onclick="closeModal('receive-form-modal')" class="text-gray-500 hover:text-red-500 text-2xl font-bold">&times;</button>
+            </div>
+            <form id="receiveForm" onsubmit="submitTransactionForm(event, 'RECEIVE')" class="space-y-3">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">เลือกอุปกรณ์ที่รับเข้า</label>
+                    <select id="receive-item" required onchange="checkItemType('receive')" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                        <option value="">-- กรุณาเลือก --</option>
+                    </select>
+                </div>
+                <div id="receive-fiber-fields" class="hidden bg-green-50 p-3 rounded-lg border border-green-200 space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">เลข PO</label>
+                            <input type="text" id="receive-po" class="w-full border border-gray-300 rounded-lg p-2 bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">หมายเลข Drum (เช่น 40)</label>
+                            <input type="text" id="receive-drum-no" class="w-full border border-gray-300 rounded-lg p-2 bg-white" placeholder="40">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">หมายเลข Batch (เช่น 68M290)</label>
+                        <input type="text" id="receive-batch" class="w-full border border-gray-300 rounded-lg p-2 bg-white" placeholder="68M290">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">จำนวนความยาว/ชิ้น ที่รับเข้า</label>
+                    <input type="number" id="receive-qty" min="1" step="0.01" required class="w-full border border-gray-300 rounded-lg p-2 font-bold text-lg">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">หมายเหตุ</label>
+                    <input type="text" id="receive-remark" class="w-full border border-gray-300 rounded-lg p-2">
+                </div>
+                <div class="pt-3">
+                    <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition">บันทึกรับเข้าคลัง</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="transfer-form-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-lg w-11/12 max-w-md max-h-[90vh] overflow-y-auto p-5">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-purple-700">🔄 ฟอร์มโอนย้ายอุปกรณ์</h2>
+                <button onclick="closeModal('transfer-form-modal')" class="text-gray-500 hover:text-red-500 text-2xl font-bold">&times;</button>
+            </div>
+            <form id="transferForm" onsubmit="submitTransactionForm(event, 'TRANSFER')" class="space-y-3">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">โอนย้ายไปให้คลัง/ทีม ไหน?</label>
+                    <select id="transfer-to" required class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                        <option value="">-- เลือกทีมปลายทาง --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">เลือกอุปกรณ์ที่จะโอน</label>
+                    <select id="transfer-item" required onchange="checkItemType('transfer')" class="w-full border border-gray-300 rounded-lg p-2 outline-none">
+                        <option value="">-- กรุณาเลือก --</option>
+                    </select>
+                </div>
+                <div id="transfer-fiber-fields" class="hidden bg-purple-50 p-3 rounded-lg border border-purple-200 space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">เลือกม้วนสายที่จะโอน</label>
+                        <select id="transfer-drum" class="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm">
+                            <option value="">-- กรุณาเลือกม้วนสาย --</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">จำนวนที่ต้องการโอน</label>
+                    <input type="number" id="transfer-qty" min="1" step="0.01" required class="w-full border border-gray-300 rounded-lg p-2 font-bold text-lg">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">หมายเหตุ</label>
+                    <input type="text" id="transfer-remark" class="w-full border border-gray-300 rounded-lg p-2">
+                </div>
+                <div class="pt-3">
+                    <button type="submit" class="w-full bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition">ยืนยันการโอนย้าย</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const LIFF_ID = "2010453338-iG1ZDSQ8"; 
+        async function initializeLiff() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (liff.isLoggedIn()) { getUserProfile(); } else { liff.login(); }
+            } catch (err) { Swal.fire('Error', 'ไม่สามารถเชื่อมต่อ LINE ได้', 'error'); }
+        }
+        async function getUserProfile() {
+            try {
+                const profile = await liff.getProfile();
+                document.getElementById('user-profile-img').src = profile.pictureUrl;
+                document.getElementById('user-profile-img').classList.remove('hidden');
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('app-content').style.display = 'block';
+                checkUserAccess(profile.userId, profile.displayName);
+            } catch (err) { console.error(err); }
+        }
+
+        // โหมด Local Test (ยังไม่ได้ใช้ LIFF ของจริง)
+        window.onload = function() {
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            checkUserAccess("U_Mock_12345", "ช่างทดสอบ (Local)");
+        };
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>
