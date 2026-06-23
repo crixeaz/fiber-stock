@@ -1,5 +1,5 @@
 // 📌 จุดที่ต้องแก้: เอา Web App URL อันใหม่ที่ได้จากการ Deploy มาใส่
-const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE"; 
+const API_URL = "https://script.google.com/macros/s/AKfycbxIbDfben0MdVMxl6bYWQ_MqhFbIN9wK2jgq2_rAswNAiXbdTfzFVpImPOfzXnTYqVP/exec"; 
 
 let masterData = {};
 let currentProfileData = null; 
