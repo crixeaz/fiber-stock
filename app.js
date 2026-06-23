@@ -1,5 +1,5 @@
 // **อย่าลืมเปลี่ยน URL ตรงนี้หากมีการ Deploy Google Apps Script เวอร์ชันใหม่**
-const API_URL = "https://script.google.com/macros/s/AKfycbzp5ubyx2zd3wIlAJXiZeJErTTQ33um5ukUjsm0yYfeBf9zQatdB6-tZ9EuxV8bwkTx/exec"; 
+const API_URL = "https://script.google.com/macros/s/AKfycbyznAFRD_RUz4vyvcVbBs7irJGdTJkJv1NnO93cXciJpbTDv_-F4lpiWIYGXrJCbh93/exec"; 
 
 let masterData = {};
 let currentUser = {};
