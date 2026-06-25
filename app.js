@@ -42,7 +42,7 @@ async function fetchMasterData(userProfile) {
     } catch (error) { document.getElementById('inventory-list').innerHTML = `<div class="text-center text-red-500">โหลดสต๊อกล้มเหลว</div>`; }
 }
 
-function renderInventory() { /* โค้ดเดิมย่อไว้เพื่อประหยัดพื้นที่ แต่ต้องมี */
+function renderInventory() {
     const container = document.getElementById('inventory-list'); container.innerHTML = ''; 
     let activeLocations = userRole === "Admin" ? masterData.locations : masterData.locations.filter(l => l.location_id === userTeam);
     activeLocations.forEach(loc => {
@@ -90,7 +90,6 @@ function setupUniversalForm(prefix) {
         }
         resetCart(); // ล้างตะกร้าเก่าทิ้ง
     } else {
-        // ... โลจิก Form รับเข้า/โอน (โค้ดชุดเดิม)
         if (prefix === 'receive') {
             const toSelect = document.getElementById('receive-to-warehouse'); toSelect.innerHTML = '';
             if (userRole === "Admin") masterData.locations.forEach(l => { toSelect.options.add(new Option(l.location_name, l.location_id)); });
@@ -181,7 +180,12 @@ function updateCartDropdowns() {
             const sel = document.getElementById(`sel-drum-${r.id}`);
             const currentVal = sel.value;
             sel.innerHTML = '<option value="">-- กรุณาเลือกม้วนสาย --</option>';
-            masterData.drums.filter(d => d.location_id === srcWh && masterData.items.find(i=>i.item_id===d.item_id).category === "Fiber Cable").forEach(d => {
+            
+            // ✅ แก้ไขจุดที่ 1: ป้องกัน Error หน้าจอขาว หากมีคนลบ Item ออกจากระบบ
+            masterData.drums.filter(d => {
+                let item = masterData.items.find(i => i.item_id === d.item_id);
+                return d.location_id === srcWh && item && item.category === "Fiber Cable";
+            }).forEach(d => {
                 // โชว์เฉพาะม้วนที่ยังไม่ถูกเลือก หรือม้วนที่เป็นของแถวนี้อยู่แล้ว
                 if(!selectedDrums.includes(d.drum_id) || d.drum_id === currentVal) {
                     sel.add(new Option(`[${d.item_id}] Drum${d.drum_no}/${d.batch_no} | เหลือ ${d.current_length}ม.`, d.drum_id));
@@ -259,21 +263,55 @@ async function submitCartForm(event) {
 
 async function shareCartToLineGroup(payload, txId) {
     if (!liff.isApiAvailable('shareTargetPicker')) return;
-    let msgText = `🛒 บิลเบิกใช้งาน (Job Cart)\nรหัสบิล: ${txId}\nบันทึกโดย: ${payload.user_id}\nใบงาน: ${payload.ref_job_id}\n----------------\n`;
+
+    // 🏛️ ค้นหาชื่อคลังภาษาไทยเต็มๆ จาก masterData เพื่อความตรงกันกับหลังบ้าน
+    let locName = payload.from_location;
+    if (masterData && masterData.locations) {
+        const foundLoc = masterData.locations.find(l => l.location_id === payload.from_location);
+        if (foundLoc) {
+            locName = foundLoc.location_name;
+        }
+    }
+
+    // ✅ แก้ไขจุดที่ 2: เพิ่มรหัสบิล (txId) ลงไปในข้อความแชร์
+    let msgText = `🛒 บิลเบิกใช้งาน (Job Cart)\n🔖 รหัสบิล: ${txId}\n👤 บันทึกโดย: ${payload.user_id}\n🏛️ เบิกจากคลัง: ${locName}\n📝 ใบงาน: ${payload.ref_job_id}\n----------------\n`;
 
     payload.items.forEach(item => {
         if (item.type === "FIBER") {
+            // ค้นหาข้อมูลม้วนสายและชื่ออุปกรณ์เพื่อแสดงรายละเอียดเต็ม
             const drum = masterData.drums.find(d => d.drum_id === item.drum_id);
-            const itemName = masterData.items.find(i=>i.item_id===drum.item_id).item_name;
-            msgText += `✂️ [Fiber] ${itemName}\n🏷️ Drum${drum.drum_no} (F.ML${String(item.mark_end).padStart(4,'0')} - T.ML${String(item.mark_start).padStart(4,'0')}) = ${item.qty}m.\n`;
+            let itemName = item.item_id;
+            let dName = item.drum_id;
+
+            if (drum) {
+                dName = `Drum${drum.drum_no}/${drum.batch_no}`;
+                const foundItem = masterData.items.find(i => i.item_id === drum.item_id);
+                if (foundItem) itemName = foundItem.item_name;
+            }
+
+            const mStart = String(item.mark_start).padStart(4, '0');
+            const mEnd = String(item.mark_end).padStart(4, '0');
+            
+            msgText += `✂️ [Fiber] ${itemName}\n🏷️ ${dName} (F.ML${mEnd} - T.ML${mStart}) = ${item.qty}m.\n`;
         } else {
-            const itemName = masterData.items.find(i=>i.item_id===item.item_id).item_name;
+            // ค้นหาชื่ออุปกรณ์ประกอบภาษาไทย
+            let itemName = item.item_id;
+            if (masterData && masterData.items) {
+                const foundItem = masterData.items.find(i => i.item_id === item.item_id);
+                if (foundItem) itemName = foundItem.item_name;
+            }
             msgText += `🔌 [อุปกรณ์] ${itemName} = ${item.qty} ชิ้น\n`;
         }
     });
+    
     msgText += `----------------\n📋 หมายเหตุ: ${payload.remark || '-'}`;
     
-    try { await liff.shareTargetPicker([{ type: "text", text: msgText }]); } catch (error) {}
+    // 🚀 ยิงหน้าต่างเปิดให้ช่างเลือกกลุ่มเพื่อส่งข้อความที่สมบูรณ์แบบนี้ออกไป
+    try { 
+        await liff.shareTargetPicker([{ type: "text", text: msgText }]); 
+    } catch (error) {
+        console.error("Share failed:", error);
+    }
 }
 
 /* ฟังก์ชัน Transfer/Receive เดิม คงไว้เพื่อให้ทำงานได้ */
