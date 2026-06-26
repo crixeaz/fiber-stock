@@ -158,9 +158,42 @@ function removeCartRow(rId) {
 }
 
 function calcFiberCartQty(rId) {
-    let s = parseFloat(document.getElementById(`tml-${rId}`).value) || 0;
-    let e = parseFloat(document.getElementById(`fml-${rId}`).value) || 0;
-    if (s > 0 && e > 0) document.getElementById(`qty-${rId}`).value = Math.abs(e - s);
+    let tmlInput = document.getElementById(`tml-${rId}`);
+    let fmlInput = document.getElementById(`fml-${rId}`);
+    let qtyInput = document.getElementById(`qty-${rId}`);
+    let drumId = document.getElementById(`sel-drum-${rId}`).value;
+
+    // 1. ดักจับกรณีช่องใดช่องหนึ่งถูกลบจนว่างเปล่า ให้ล้างค่าช่องจำนวน (แก้ปัญหาลบแล้วค่าค้าง)
+    if (tmlInput.value === "" || fmlInput.value === "") {
+        qtyInput.value = "";
+        return;
+    }
+
+    let s = parseFloat(tmlInput.value) || 0;
+    let e = parseFloat(fmlInput.value) || 0;
+    let calculatedQty = Math.abs(e - s);
+
+    // 2. ตรวจสอบความยาวที่เบิก กับความยาวคงเหลือของม้วนสาย (แก้ปัญหาเบิกเกิน)
+    if (drumId) {
+        let drum = masterData.drums.find(d => d.drum_id === drumId);
+        
+        if (drum && calculatedQty > drum.current_length) {
+            // แจ้งเตือนช่าง
+            Swal.fire({
+                icon: 'warning',
+                title: 'เบิกเกินความยาวที่มี!',
+                text: `ม้วนสายนี้เหลือเพียง ${drum.current_length} เมตร (คุณระบุไป ${calculatedQty} เมตร)`
+            });
+            
+            // ล้างค่า FML และช่องจำนวนออก เพื่อบังคับให้ช่างกรอกตัวเลขใหม่ให้ถูกต้อง
+            fmlInput.value = ""; 
+            qtyInput.value = "";
+            return;
+        }
+    }
+
+    // ถ้าตรวจสอบผ่านทั้งหมด ค่อยแสดงตัวเลขผลลัพธ์
+    qtyInput.value = calculatedQty;
 }
 
 // 🧠 ลอจิกความฉลาด: ซ่อนตัวเลือกที่ถูกเลือกไปแล้ว
