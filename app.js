@@ -124,8 +124,8 @@ function addFiberRow() {
             <option value="">-- กรุณาเลือกม้วนสาย --</option>
         </select>
         <div class="grid grid-cols-3 gap-2 text-xs">
-            <div><label class="text-gray-500">F.ML</label><input type="number" id="fml-${rId}" class="w-full border p-1.5 rounded outline-none" oninput="calcFiberCartQty(${rId})" required></div>
-            <div><label class="text-gray-500">T.ML</label><input type="number" id="tml-${rId}" class="w-full border p-1.5 rounded outline-none" oninput="calcFiberCartQty(${rId})" required></div>
+            <div><label class="text-gray-500">จุดเริ่ม (T.ML)</label><input type="number" id="tml-${rId}" class="w-full border p-1.5 rounded outline-none" oninput="calcFiberCartQty(${rId})" required></div>
+            <div><label class="text-gray-500">จุดสิ้นสุด (F.ML)</label><input type="number" id="fml-${rId}" class="w-full border p-1.5 rounded outline-none" oninput="calcFiberCartQty(${rId})" required></div>
             <div><label class="text-gray-500">จำนวน(ม.)</label><input type="number" id="qty-${rId}" class="w-full border p-1.5 rounded bg-gray-100 font-bold text-blue-700 outline-none" readonly required></div>
         </div>
     `;
